@@ -1,0 +1,134 @@
+#- Virtuoso production deployment -#
+version: '2'
+
+services:
+  #- Front-end -#
+  virtuoso:
+    image: thecoffeine/virtuoso
+    ports:
+      - "80:80"
+      - "443:443"
+    links:
+      - virtuoso-api
+      - storage
+
+  virtuoso-api:
+    image: thecoffeine/virtuoso-api
+    environment:
+      DB_HOST: postgres
+    ports:
+      - "8080"
+    links:
+      - config
+      - auth
+      - storage
+      - postgres
+
+  storage:
+    image: thecoffeine/storage
+    ports:
+      - "8080"
+    links:
+      - config
+      - rabbitmq
+      - mongodb
+      - auth
+
+  auth:
+    image: thecoffeine/auth
+    environment:
+      DB_HOST: authdb
+    ports:
+      - "8080"
+    links:
+      - config
+      - authdb
+
+  edge:
+    image: thecoffeine/edge
+    environment:
+      VCAP_APPLICATION_PORT: 8765
+    ports:
+      - "8765"
+    links:
+      - config
+      - auth
+      - virtuoso-api
+      - storage
+
+  discovery:
+    image: thecoffeine/discovery
+    environment:
+      VCAP_APPLICATION_PORT: 8761
+    ports:
+      - "8761"
+    links:
+      - config
+
+  config:
+    image: thecoffeine/config
+    environment:
+      VCAP_APPLICATION_PORT: 8888
+    ports:
+      - "8888"
+
+  #- JMS :: RabitMQ -#
+  rabbitmq:
+    image: rabbitmq:3.6
+    environment:
+      RABBITMQ_DEFAULT_USER: virtuoso
+      RABBITMQ_DEFAULT_PASS: virtuoso
+    ports:
+      - "5672"
+
+  #- Database -#
+  postgres:
+    image: postgres:9.6
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    ports:
+     - "5432"
+    environment:
+      POSTGRES_DB: "virtuoso"
+      POSTGRES_USER: "virtuoso"
+      POSTGRES_PASSWORD: "virtuoso"
+      PGDATA: "/var/lib/postgresql/data"
+
+  #- Database -#
+  authdb:
+    image: postgres:9.6
+    volumes:
+      - postgres_auth:/var/lib/postgresql/data
+    ports:
+     - "5432"
+    environment:
+      POSTGRES_DB: "virtuoso"
+      POSTGRES_USER: "virtuoso"
+      POSTGRES_PASSWORD: "virtuoso"
+      PGDATA: "/var/lib/postgresql/data"
+
+  #- JMS :: RabitMQ -#
+  rabbitmq:
+    image: rabbitmq:3.6
+    environment:
+      RABBITMQ_DEFAULT_USER: virtuoso
+      RABBITMQ_DEFAULT_PASS: virtuoso
+    ports:
+      - "5672"
+
+  #- Database :: Sharded cluster -#
+  #- Router :: #1 -#
+  mongodb:
+    image: thecoffeine/mongo
+    ports:
+      - 27017
+    volumes:
+      - mongo:/data/db
+    command: mongod --auth --keyFile /tmp/keyfile
+
+volumes:
+  #- PostgreSQL -#
+  postgres:
+  postgres_auth:
+  #- File storage -#
+  mongo:
